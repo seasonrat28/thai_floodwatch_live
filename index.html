@@ -1053,16 +1053,7 @@
     </div>
 
 
-    <!-- Floating Action Button (FAB): แจ้งน้ำท่วมสด -->
-    <button id="fabLiveReport" onclick="openReportModal()" title="ร่วมปักหมุดแจ้งน้ำท่วมสดในพื้นที่จริง"
-        class="fab-report px-4 py-3 bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl shadow-xl shadow-red-600/40 border border-red-400/40 flex items-center gap-2.5 font-medium text-sm transition-all duration-300 group backdrop-blur-md">
-        <span class="relative flex h-3 w-3">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-        </span>
-        <i class="fa-solid fa-bullhorn text-base group-hover:rotate-12 transition-transform"></i>
-        <span class="font-semibold tracking-wide">แจ้งน้ำท่วมสด</span>
-    </button>
+    
 
     <!-- Toast Notification -->
     <div id="toastMessage"
@@ -1072,15 +1063,29 @@
     </div>
 
     
-    <!-- Jitasa Care Floating Button -->
-    <a href="https://jitasa.care/th" target="_blank" id="jitasa-btn"
-        class="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-[999] bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-5 py-3 rounded-full shadow-lg hover:shadow-red-500/50 hover:scale-105 transition-all duration-300 flex items-center gap-2 group ring-2 ring-white/20">
-        <div class="relative flex h-3 w-3">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-        </div>
-        <span class="font-bold text-sm tracking-wide">ขอความช่วยเหลือ</span>
-    </a>
+    
+    <!-- Floating Action Buttons Container -->
+    <div class="fixed z-[1050] flex flex-col gap-2.5 w-[160px] sm:w-[180px]" style="bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)); right: calc(1.5rem + env(safe-area-inset-right, 0px));">
+        
+        <!-- Jitasa Care Button -->
+        <a href="https://jitasa.care/th" target="_blank" id="jitasa-btn"
+            class="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white px-4 py-3 rounded-2xl shadow-lg hover:shadow-red-500/50 hover:-translate-y-0.5 hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2 group ring-1 ring-white/20 backdrop-blur-md">
+            <div class="relative flex h-3 w-3 shrink-0">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+            </div>
+            <span class="font-bold text-sm tracking-wide truncate">ขอความช่วยเหลือ</span>
+        </a>
+
+        <!-- Live Flood Report Button -->
+        <button id="fabLiveReport" onclick="openReportModal()" title="คลิกเพื่อปักหมุดแจ้งพื้นที่น้ำท่วมให้ทุกคนทราบ"
+            class="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white px-4 py-3 rounded-2xl shadow-xl hover:shadow-red-600/40 hover:-translate-y-0.5 hover:scale-[1.02] border border-red-400/40 flex items-center justify-center gap-2 font-medium text-sm transition-all duration-300 group backdrop-blur-md">
+            <i class="fa-solid fa-bullhorn text-base group-hover:rotate-12 transition-transform shrink-0"></i>
+            <span class="font-semibold tracking-wide truncate">แจ้งน้ำท่วมสด</span>
+        </button>
+
+    </div>
+
 
     <!-- Footer -->
     <footer
