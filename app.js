@@ -1405,7 +1405,7 @@ async function fetchLiveDamData() {
         const data = await response.json();
         
         let updated = false;
-        data.forEach(regionData => {
+        (data.data || []).forEach(regionData => {
             if (regionData.dam && Array.isArray(regionData.dam)) {
                 regionData.dam.forEach(damApi => {
                     const searchName = damApi.name.replace('เขื่อน', '').trim();
