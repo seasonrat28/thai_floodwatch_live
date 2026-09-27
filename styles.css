@@ -58,12 +58,6 @@ body {
 .scroll-touch-x {
     -webkit-overflow-scrolling: touch;
     overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-.scroll-touch-x::-webkit-scrollbar {
-    display: none;
 }
 
 /* 4. Glassmorphism Panels (with WebKit fallback for older Safari) */

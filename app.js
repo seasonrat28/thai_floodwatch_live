@@ -1644,3 +1644,35 @@ function simulateLiveVisitors() {
 document.addEventListener('DOMContentLoaded', () => {
     simulateLiveVisitors();
 });
+// Enable drag to scroll for horizontal scroll containers (Desktop UX)
+document.addEventListener('DOMContentLoaded', () => {
+    const scrollContainers = document.querySelectorAll('.scroll-touch-x');
+    scrollContainers.forEach(ele => {
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+
+        ele.addEventListener('mousedown', (e) => {
+            isDown = true;
+            ele.classList.add('cursor-grabbing');
+            startX = e.pageX - ele.offsetLeft;
+            scrollLeft = ele.scrollLeft;
+        });
+        ele.addEventListener('mouseleave', () => {
+            isDown = false;
+            ele.classList.remove('cursor-grabbing');
+        });
+        ele.addEventListener('mouseup', () => {
+            isDown = false;
+            ele.classList.remove('cursor-grabbing');
+        });
+        ele.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - ele.offsetLeft;
+            const walk = (x - startX) * 2; // Scroll speed multiplier
+            ele.scrollLeft = scrollLeft - walk;
+        });
+    });
+});
+
