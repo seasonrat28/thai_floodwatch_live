@@ -1111,9 +1111,9 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
             }, 1000);
         }
 
-        function getUserLocation() {
+        function getUserLocation(silent = false) {
             if (navigator.geolocation) {
-                showToast("กำลังค้นหาพิกัด GPS อุปกรณ์ของคุณ...");
+                if (!silent) showToast("กำลังค้นหาพิกัด GPS อุปกรณ์ของคุณ...");
                 navigator.geolocation.getCurrentPosition(
                     pos => {
                         const lat = pos.coords.latitude;
@@ -1126,14 +1126,14 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
                         else if (lon > 101.1 && lat < 14.5 && lat > 13.0) guessedRegion = 'east';
 
                         selectCity('ตำแหน่ง GPS ของคุณ', lat, lon, guessedProv, guessedRegion);
-                        showToast("ระบุพิกัด GPS สำเร็จ และปรับปรุงข้อมูลจุดเสี่ยงรอบตัวคุณแล้ว");
+                        if (!silent) showToast("ระบุพิกัด GPS สำเร็จ และปรับปรุงข้อมูลจุดเสี่ยงรอบตัวคุณแล้ว");
                     },
                     () => {
-                        showToast("ไม่สามารถเข้าถึงพิกัด GPS ได้ กรุณาอนุญาตการเข้าถึง", false);
+                        if (!silent) showToast("ไม่สามารถเข้าถึงพิกัด GPS ได้ กรุณาอนุญาตการเข้าถึง", false);
                     }
                 );
             } else {
-                showToast("อุปกรณ์ไม่รองรับการระบุตำแหน่ง GPS", false);
+                if (!silent) showToast("อุปกรณ์ไม่รองรับการระบุตำแหน่ง GPS", false);
             }
         }
 
@@ -1463,6 +1463,9 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
             renderWaterways();
             renderCommunityReports();
             fetchWeatherData(currentCoords.lat, currentCoords.lon, currentCoords.name);
+
+            // Auto-fetch GPS on startup silently
+            getUserLocation(true);
         });
     
 
