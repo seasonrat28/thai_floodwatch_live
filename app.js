@@ -1612,39 +1612,6 @@ async function fetchLiveDamData() {
 window.fetchLiveDamData = fetchLiveDamData;
 
 
-// --- Live Visitor Simulation ---
-// ใช้จำลองผู้เข้าชมแบบเรียลไทม์จนกว่าจะเชื่อมต่อกับ Firebase Realtime Database
-function simulateLiveVisitors() {
-    const liveEl = document.getElementById('visitorOnlineCount') || document.getElementById('live-visitors');
-    if (!liveEl) return;
-    
-    let baseUsers = Math.floor(Math.random() * 15) + 10; // 10-25
-    liveEl.textContent = baseUsers;
-    
-    setInterval(() => {
-        const change = Math.random() > 0.5 ? 1 : -1;
-        const shouldChange = Math.random() > 0.3;
-        
-        if (shouldChange) {
-            baseUsers += change;
-            if (baseUsers < 3) baseUsers = 3;
-            if (baseUsers > 45) baseUsers = 45;
-            
-            // Animation effect
-            liveEl.style.opacity = '0.3';
-            setTimeout(() => {
-                liveEl.textContent = baseUsers;
-                liveEl.style.opacity = '1';
-            }, 300);
-        }
-    }, 5000);
-}
-
-// Start simulation on load
-document.addEventListener('DOMContentLoaded', () => {
-    simulateLiveVisitors();
-});
-// Enable drag to scroll for horizontal scroll containers (Desktop UX)
 document.addEventListener('DOMContentLoaded', () => {
     const scrollContainers = document.querySelectorAll('.scroll-touch-x');
     scrollContainers.forEach(ele => {
