@@ -1366,6 +1366,38 @@ window.WeatherService = WeatherService;
 
 
 // --- Live Dam Data Integration ---
+
+const GISTDA_API_KEY = 'CWVhuWdxVNGw0TK54Q7tqAV02jVgxh9xZEHwc0IO440O83VLxISoswFHD2FmL4HC';
+
+async function fetchLiveRoadFloodData() {
+    try {
+        console.log('Attempting to fetch road flood data from GISTDA API...');
+        // Endpoint placeholder based on typical GISTDA API Gateway structure
+        const endpoint = `https://api-gateway.gistda.or.th/api/2.0/resources/gi-service/v1.0/disasters/flood-extent-1day?api_key=${GISTDA_API_KEY}`;
+        
+        const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+                // 'Referer': 'https://seasonrat28.github.io/' // Auto-handled by browser if deployed
+            }
+        });
+
+        if (!response.ok) {
+            console.warn('GISTDA API returned ' + response.status + ' - Fallback to local data (Endpoint may require adjustment).');
+            return;
+        }
+
+        const data = await response.json();
+        console.log('GISTDA Road Flood API Success:', data);
+        
+        // Future logic: map 'data' to 'allFloodPoints'
+        // For now, we confirm connection works!
+        
+    } catch (e) {
+        console.warn('GISTDA API Fetch Error (CORS or Network):', e);
+    }
+}
+
 async function fetchLiveDamData() {
     try {
         const response = await fetch('https://app.rid.go.th/reservoir/api/dam/public');
