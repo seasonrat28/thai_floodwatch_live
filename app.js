@@ -1318,6 +1318,7 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
             });
 
             // Initialize entire dashboard
+            fetchLiveDamData();
             initMap();
             renderDamCards();
             renderRoads();
@@ -1362,3 +1363,47 @@ window.showToast = showToast;
 window.clearSearch = clearSearch;
 window.ReportService = ReportService;
 window.WeatherService = WeatherService;
+
+
+// --- Live Dam Data Integration ---
+async function fetchLiveDamData() {
+    try {
+        const response = await fetch('https://app.rid.go.th/reservoir/api/dam/public');
+        if (!response.ok) return;
+        const data = await response.json();
+        
+        let updated = false;
+        data.forEach(regionData => {
+            if (regionData.dam && Array.isArray(regionData.dam)) {
+                regionData.dam.forEach(damApi => {
+                    const searchName = damApi.name.replace('เขื่อน', '').trim();
+                    let foundDam = damDatabase.find(d => d.name.includes(searchName));
+                    if (foundDam) {
+                        foundDam.percent = damApi.percent_storage;
+                        foundDam.storage = `ความจุน้ำ ${damApi.volume.toFixed(2)} ล้าน ลบ.ม. (ระบาย ${damApi.outflow !== null ? damApi.outflow : 0} ลบ.ม./วินาที)`;
+                        
+                        if (foundDam.percent >= 80) {
+                            foundDam.status = 'danger';
+                            foundDam.statusText = 'วิกฤต/ต้องเฝ้าระวัง';
+                        } else if (foundDam.percent >= 60) {
+                            foundDam.status = 'warning';
+                            foundDam.statusText = 'ระดับน้ำมาก/เฝ้าระวัง';
+                        } else {
+                            foundDam.status = 'normal';
+                            foundDam.statusText = 'ปกติ';
+                        }
+                        updated = true;
+                    }
+                });
+            }
+        });
+        
+        if (updated) {
+            renderDamCards();
+            if (typeof renderMapPins === 'function') renderMapPins();
+        }
+    } catch (e) {
+        console.error('Failed to fetch live dam data', e);
+    }
+}
+window.fetchLiveDamData = fetchLiveDamData;
