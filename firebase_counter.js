@@ -4,6 +4,7 @@ import { getDatabase, ref, onValue, set, onDisconnect } from "https://www.gstati
 const firebaseConfig = {
     apiKey: "AIzaSyCH2grBGTy6C5c9r1EbaI0SPOzEajNx0eg",
     authDomain: "thai-floodwatch.firebaseapp.com",
+    databaseURL: "https://thai-floodwatch-default-rtdb.firebaseio.com",
     projectId: "thai-floodwatch",
     storageBucket: "thai-floodwatch.firebasestorage.app",
     messagingSenderId: "445668806357",
