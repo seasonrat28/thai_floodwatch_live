@@ -1115,13 +1115,45 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
             document.getElementById('reportModal').classList.add('hidden');
         }
 
-        async function handleReportSubmit(e) {
+                async function handleReportSubmit(e) {
             e.preventDefault();
+            
+            // --- [ANTI-SPAM SYSTEM] ระบบ Rate Limiting ป้องกันการส่งข้อมูลถี่เกินไป ---
+            const LAST_REPORT_TIME_KEY = 'thai_floodwatch_last_submit_time';
+            const lastSubmit = localStorage.getItem(LAST_REPORT_TIME_KEY);
+            const nowTimestamp = Date.now();
+            
+            if (lastSubmit) {
+                const timePassed = nowTimestamp - parseInt(lastSubmit, 10);
+                const cooldownPeriod = 60 * 1000; // ตั้งค่า Cooldown ไว้ที่ 60 วินาที
+                
+                if (timePassed < cooldownPeriod) {
+                    const secondsLeft = Math.ceil((cooldownPeriod - timePassed) / 1000);
+                    showToast(`โปรดรออีก ${secondsLeft} วินาทีก่อนส่งรายงานฉบับถัดไป เพื่อป้องกันระบบสแปม`, false);
+                    return;
+                }
+            }
+
             const location = document.getElementById('reportLocation').value.trim();
             const district = document.getElementById('reportDistrict').value.trim();
             const province = document.getElementById('reportProvince').value.trim();
             const level = document.getElementById('reportLevel').value;
             const details = document.getElementById('reportDetails').value.trim();
+
+            // ระบบป้องกันฟิลด์ว่าง
+            if (!location || !district || !province) {
+                showToast("กรุณากรอกข้อมูลสถานที่ อำเภอ และจังหวัดให้ครบถ้วน", false);
+                return;
+            }
+
+            const targetLat = reportCoords ? reportCoords.lat : currentCoords.lat;
+            const targetLon = reportCoords ? reportCoords.lon : currentCoords.lon;
+
+            // --- [VALIDATION] ตรวจสอบขอบเขตพิกัดพิกัด GPS ให้อยู่ในขอบเขตประเทศไทยจริง ---
+            if (targetLat < 5.5 || targetLat > 20.5 || targetLon < 97.0 || targetLon > 106.0) {
+                showToast("พิกัด GPS ไม่ถูกต้องหรืออยู่นอกขอบเขตประเทศไทย", false);
+                return;
+            }
 
             const levelTexts = {
                 'danger': 'วิกฤต (15-30+ ซม.)',
@@ -1130,7 +1162,7 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
             };
 
             const newReport = {
-                id: Date.now(),
+                id: nowTimestamp,
                 user: 'คุณ (ผู้ใช้งานสด)',
                 location: location,
                 district: district,
@@ -1139,12 +1171,18 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
                 levelText: levelTexts[level],
                 details: details || 'ไม่มีรายละเอียดเพิ่มเติม',
                 time: 'เมื่อสักครู่',
-                lat: reportCoords ? reportCoords.lat : currentCoords.lat,
-                lon: reportCoords ? reportCoords.lon : currentCoords.lon,
+                lat: targetLat,
+                lon: targetLon,
                 upvotes: 1
             };
 
+            // บันทึกรายงานเข้าสู่ State
             communityReports.unshift(newReport);
+            
+            // บันทึกลง LocalStorage ผ่านโครงสร้าง Firebase-Ready Architecture
+            if (typeof ReportService !== 'undefined') {
+                await ReportService.saveReport(newReport);
+            }
             renderCommunityReports();
             renderMapPins();
 
@@ -1152,6 +1190,9 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
             document.getElementById('reportForm').reset();
             reportCoords = null;
             document.getElementById('gpsReportText').textContent = "ดึงพิกัดปัจจุบัน";
+
+            // บันทึกเวลาส่งล่าสุดเพื่อเปิดใช้งานการสกัดกั้นในรอบถัดไป
+            localStorage.setItem(LAST_REPORT_TIME_KEY, nowTimestamp.toString());
 
             showToast("ส่งรายงานสดสำเร็จ และปักหมุดลงบนแผนที่แล้ว ขอบคุณที่ร่วมแบ่งปันข้อมูล!");
             switchTab('communityTab');
@@ -1372,29 +1413,59 @@ const GISTDA_API_KEY = 'CWVhuWdxVNGw0TK54Q7tqAV02jVgxh9xZEHwc0IO440O83VLxISoswFH
 async function fetchLiveRoadFloodData() {
     try {
         console.log('Attempting to fetch road flood data from GISTDA API...');
-        // Endpoint placeholder based on typical GISTDA API Gateway structure
+        // ดึงข้อมูลพื้นที่และจุดน้ำท่วมอัปเดตรายวันจาก GISTDA Gateway
         const endpoint = `https://api-gateway.gistda.or.th/api/2.0/resources/gi-service/v1.0/disasters/flood-extent-1day?api_key=${GISTDA_API_KEY}`;
         
         const response = await fetch(endpoint, {
             method: 'GET',
             headers: {
-                // 'Referer': 'https://seasonrat28.github.io/' // Auto-handled by browser if deployed
+                'Accept': 'application/json'
             }
         });
 
         if (!response.ok) {
-            console.warn('GISTDA API returned ' + response.status + ' - Fallback to local data (Endpoint may require adjustment).');
+            console.warn(`GISTDA API returned ${response.status} - Fallback to local database.`);
             return;
         }
 
-        const data = await response.json();
-        console.log('GISTDA Road Flood API Success:', data);
+        const jsonResult = await response.json();
+        console.log('GISTDA Road Flood API Success:', jsonResult);
         
-        // Future logic: map 'data' to 'allFloodPoints'
-        // For now, we confirm connection works!
+        // ตรวจสอบโครงสร้างข้อมูลและทำการแมปข้อมูลจริงเข้ากับจุดเสี่ยงในระบบ (Dynamic Data Mapping)
+        if (jsonResult && Array.isArray(jsonResult.features)) {
+            const livePoints = jsonResult.features.map((feature, index) => {
+                const props = feature.properties || {};
+                const coords = feature.geometry ? feature.geometry.coordinates : null;
+                
+                return {
+                    id: 500 + index, // รัน ID ต่อจากข้อมูล Static เดิม
+                    name: props.location_name || props.road_name || 'พบพื้นที่น้ำท่วมขังตรวจพบโดยดาวเทียม',
+                    province: props.province_th || 'ไม่ระบุจังหวัด',
+                    district: props.district_th || 'ไม่ระบุอำเภอ',
+                    region: props.region || 'central',
+                    status: 'danger',
+                    statusText: 'ท่วมขังวิกฤต',
+                    depth: props.flood_depth ? `${props.flood_depth} ซม.` : '15-30 ซม.',
+                    lat: coords && coords[1] ? coords[1] : currentCoords.lat,
+                    lon: coords && coords[0] ? coords[0] : currentCoords.lon,
+                    desc: props.description || `ดาวเทียม GISTDA ตรวจพบขอบเขตพื้นที่น้ำท่วมขังบริเวณนี้ ข้อมูลอัปเดตล่าสุดรายวัน`,
+                    time: 'อัปเดตสดจากดาวเทียม',
+                    bypass: props.bypass_route || 'โปรดสัญจรด้วยความระมัดระวังสูงสุดและหลีกเลี่ยงเส้นทางลุ่มต่ำ'
+                };
+            });
+
+            if (livePoints.length > 0) {
+                // ผสานข้อมูลจริงจาก API เข้ากับข้อมูลจำลองในฐานข้อมูลเดิม
+                allFloodPoints.push(...livePoints);
+                renderRoads();
+                if (typeof renderMapPins === 'function') renderMapPins();
+                console.log(`Successfully integrated ${livePoints.length} live flood points from GISTDA.`);
+            }
+        }
         
     } catch (e) {
-        console.warn('GISTDA API Fetch Error (CORS or Network):', e);
+        console.warn('GISTDA API Fetch Error (CORS, Network or Key expired):', e);
+        // ระบบจะทำงานต่อด้วย Local Data อัตโนมัติโดยไม่ทำให้ตัวแอปพลิเคชันหลักล่ม
     }
 }
 
@@ -1439,3 +1510,37 @@ async function fetchLiveDamData() {
     }
 }
 window.fetchLiveDamData = fetchLiveDamData;
+
+
+// --- Live Visitor Simulation ---
+// ใช้จำลองผู้เข้าชมแบบเรียลไทม์จนกว่าจะเชื่อมต่อกับ Firebase Realtime Database
+function simulateLiveVisitors() {
+    const liveEl = document.getElementById('live-visitors');
+    if (!liveEl) return;
+    
+    let baseUsers = Math.floor(Math.random() * 15) + 10; // 10-25
+    liveEl.textContent = baseUsers;
+    
+    setInterval(() => {
+        const change = Math.random() > 0.5 ? 1 : -1;
+        const shouldChange = Math.random() > 0.3;
+        
+        if (shouldChange) {
+            baseUsers += change;
+            if (baseUsers < 3) baseUsers = 3;
+            if (baseUsers > 45) baseUsers = 45;
+            
+            // Animation effect
+            liveEl.style.opacity = '0.3';
+            setTimeout(() => {
+                liveEl.textContent = baseUsers;
+                liveEl.style.opacity = '1';
+            }, 300);
+        }
+    }, 5000);
+}
+
+// Start simulation on load
+document.addEventListener('DOMContentLoaded', () => {
+    simulateLiveVisitors();
+});
