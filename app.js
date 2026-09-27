@@ -1253,6 +1253,40 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+    // --- CHECK INCOMING EMERGENCY LINK PARAMETERS ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedLat = parseFloat(urlParams.get('lat'));
+    const sharedLon = parseFloat(urlParams.get('lon'));
+    
+    let sharedLoc = urlParams.get('loc');
+    if (sharedLoc) {
+        try { sharedLoc = decodeURIComponent(sharedLoc); } catch(e) {}
+    }
+
+    if (sharedLat && sharedLon && sharedLoc) {
+        let sharedLvl = urlParams.get('lvl') || 'warning';
+        let sharedDet = urlParams.get('det') || 'รายงานด่วนจากพื้นที่';
+        try { sharedDet = decodeURIComponent(sharedDet); } catch(e) {}
+        
+        const sharedReport = {
+            id: Date.now(), user: 'พลเมืองดี (ลิงก์ฉุกเฉิน)',
+            location: sharedLoc, district: 'ตรวจสอบพื้นที่', province: 'ระบุจากพิกัด',
+            level: sharedLvl, levelText: sharedLvl === 'danger' ? 'วิกฤต (15-30+ ซม.)' : 'เฝ้าระวัง',
+            details: sharedDet, time: 'ดึงข้อมูลสด',
+            lat: sharedLat, lon: sharedLon, upvotes: 5
+        };
+        communityReports.unshift(sharedReport);
+        
+        setTimeout(() => {
+            selectCity(sharedLoc, sharedLat, sharedLon);
+            focusOnMapPin(sharedLat, sharedLon);
+            showToast(`เปิดจุดปักหมุดฉุกเฉินที่แชร์มา: ${sharedLoc}`);
+            
+            // เคลียร์ URL Parameter ทิ้งหลังทำงานเสร็จ ป้องกันการปักหมุดซ้ำซ้อนเมื่อกด Refresh
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }, 1200);
+    }
+
             const searchInput = document.getElementById('searchInput');
             const searchDropdown = document.getElementById('searchDropdown');
             const clearSearchBtn = document.getElementById('clearSearchBtn');
