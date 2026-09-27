@@ -1194,7 +1194,22 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
             // บันทึกเวลาส่งล่าสุดเพื่อเปิดใช้งานการสกัดกั้นในรอบถัดไป
             localStorage.setItem(LAST_REPORT_TIME_KEY, nowTimestamp.toString());
 
-            showToast("ส่งรายงานสดสำเร็จ และปักหมุดลงบนแผนที่แล้ว ขอบคุณที่ร่วมแบ่งปันข้อมูล!");
+            // --- QUICK LINK GENERATION FEATURE ---
+            const shareParams = new URLSearchParams({
+                lat: targetLat.toString(),
+                lon: targetLon.toString(),
+                loc: location,
+                lvl: level,
+                det: details
+            }).toString();
+            const shareUrl = `${window.location.origin}${window.location.pathname}?${shareParams}`;
+            
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                showToast("ส่งรายงานสำเร็จ! และคัดลอกลิงก์ปักหมุดฉุกเฉินให้แล้ว ส่งต่อเข้า LINE/Discord ได้เลย!");
+            }).catch(() => {
+                showToast("ส่งรายงานสดสำเร็จ และปักหมุดลงบนแผนที่แล้ว ขอบคุณที่ร่วมแบ่งปันข้อมูล!");
+            });
+
             switchTab('communityTab');
         }
 
@@ -1515,7 +1530,7 @@ window.fetchLiveDamData = fetchLiveDamData;
 // --- Live Visitor Simulation ---
 // ใช้จำลองผู้เข้าชมแบบเรียลไทม์จนกว่าจะเชื่อมต่อกับ Firebase Realtime Database
 function simulateLiveVisitors() {
-    const liveEl = document.getElementById('live-visitors');
+    const liveEl = document.getElementById('visitorOnlineCount') || document.getElementById('live-visitors');
     if (!liveEl) return;
     
     let baseUsers = Math.floor(Math.random() * 15) + 10; // 10-25
