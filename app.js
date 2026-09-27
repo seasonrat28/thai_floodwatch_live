@@ -169,31 +169,79 @@ const WeatherService = {
      */
     async searchLocations(keyword) {
         try {
-            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(keyword)}&format=json&accept-language=th&countrycodes=th&addressdetails=1&limit=10`;
-            const res = await fetch(url, {
-                headers: {
-                    'Accept-Language': 'th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7'
-                }
-            });
-            if (!res.ok) return [];
-            const data = await res.json();
+            // ใช้ Photon API (Elasticsearch บน OSM) ควบคู่กับ Nominatim เพื่อการค้นหา ซอย/ถนน/สถานที่ ในไทยที่แม่นยำขึ้น
+            const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(keyword)}&limit=8`;
+            const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(keyword)}&format=json&accept-language=th&countrycodes=th&addressdetails=1&limit=5`;
             
-            // แปลงรูปแบบข้อมูล Nominatim กลับไปให้ UI ตัวเดิมใช้งานได้
-            return data.map(item => {
-                const address = item.address || {};
-                const province = address.province || address.state || address.city || address.town || 'ประเทศไทย';
-                
-                // ใช้ display_name ตัดให้สั้นลงถ้ามันยาวเกินไป เพื่อใช้แสดงในผลลัพธ์
-                const shortDisplay = item.display_name.split(',').slice(0, 3).join(', ');
-                
-                return {
-                    name: item.name || shortDisplay,
-                    latitude: parseFloat(item.lat),
-                    longitude: parseFloat(item.lon),
-                    admin1: province,
-                    country: address.country || 'TH'
-                };
-            });
+            const [photonRes, nomRes] = await Promise.allSettled([
+                fetch(photonUrl),
+                fetch(nominatimUrl, { headers: { 'Accept-Language': 'th-TH' } })
+            ]);
+
+            let results = [];
+
+            // 1. Process Photon Results (มักจะเก่งเรื่อง ซอย, ถนน, พิมพ์ผิด)
+            if (photonRes.status === 'fulfilled' && photonRes.value.ok) {
+                const photonData = await photonRes.value.json();
+                const photonMapped = (photonData.features || []).map(feature => {
+                    const props = feature.properties;
+                    const coords = feature.geometry.coordinates;
+                    
+                    // สร้างชื่อรอง (เช่น คลองตันเหนือ, วัฒนา, กรุงเทพมหานคร)
+                    const subName = [props.locality, props.district, props.city, props.state]
+                        .filter(Boolean)
+                        .filter((v, i, a) => a.indexOf(v) === i) // unique
+                        .slice(0, 2)
+                        .join(', ');
+                        
+                    const displayName = props.name ? `${props.name}${subName ? ' ('+subName+')' : ''}` : subName;
+
+                    return {
+                        name: displayName || 'ไม่ระบุชื่อ',
+                        latitude: parseFloat(coords[1]),
+                        longitude: parseFloat(coords[0]),
+                        admin1: props.city || props.state || 'ประเทศไทย',
+                        country: props.countrycode || 'TH',
+                        source: 'photon'
+                    };
+                });
+                results.push(...photonMapped);
+            }
+
+            // 2. Process Nominatim Results (เก่งเรื่อง ตำบล, อำเภอ, จังหวัดทางการ)
+            if (nomRes.status === 'fulfilled' && nomRes.value.ok) {
+                const nomData = await nomRes.value.json();
+                const nomMapped = nomData.map(item => {
+                    const address = item.address || {};
+                    const province = address.province || address.state || address.city || address.town || 'ประเทศไทย';
+                    const shortDisplay = item.display_name.split(',').slice(0, 3).join(', ');
+                    
+                    return {
+                        name: item.name || shortDisplay,
+                        latitude: parseFloat(item.lat),
+                        longitude: parseFloat(item.lon),
+                        admin1: province,
+                        country: address.country_code ? address.country_code.toUpperCase() : 'TH',
+                        source: 'nominatim'
+                    };
+                });
+                results.push(...nomMapped);
+            }
+
+            // 3. Deduplicate by coordinates (ลบจุดที่ซ้ำกันหรือใกล้กันมากๆ ในระยะ ~500 เมตร)
+            const uniqueResults = [];
+            for (const item of results) {
+                const isDuplicate = uniqueResults.some(u => 
+                    Math.abs(u.latitude - item.latitude) < 0.005 && 
+                    Math.abs(u.longitude - item.longitude) < 0.005
+                );
+                if (!isDuplicate) {
+                    uniqueResults.push(item);
+                }
+            }
+
+            return uniqueResults.slice(0, 10); // คืนค่าสูงสุด 10 รายการ
+
         } catch (err) {
             console.warn('WeatherService: Geocoding ล้มเหลว:', err);
             return [];
