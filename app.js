@@ -165,85 +165,43 @@ const WeatherService = {
     },
 
     /**
-     * ค้นหาพิกัดสถานที่/อำเภอ/จังหวัดผ่าน Nominatim (OpenStreetMap)
+     * ค้นหาพิกัดสถานที่ผ่าน Mapbox Geocoding API
      */
     async searchLocations(keyword) {
         try {
-            // ใช้ Photon API (Elasticsearch บน OSM) ควบคู่กับ Nominatim เพื่อการค้นหา ซอย/ถนน/สถานที่ ในไทยที่แม่นยำขึ้น
-            const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(keyword)}&limit=8`;
-            const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(keyword)}&format=json&accept-language=th&countrycodes=th&addressdetails=1&limit=5`;
+            const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2Vhc29uMjgiLCJhIjoiY211a3hyM3lhMDA1azJ3cHV3eHJqdDR4ciJ9.JaEXACZGTqLvQwxpYBjICw'; 
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(keyword)}.json?access_token=${MAPBOX_TOKEN}&country=th&language=th&limit=8`;
             
-            const [photonRes, nomRes] = await Promise.allSettled([
-                fetch(photonUrl),
-                fetch(nominatimUrl, { headers: { 'Accept-Language': 'th-TH' } })
-            ]);
-
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Mapbox error: ${res.statusText}`);
+            
+            const data = await res.json();
             let results = [];
 
-            // 1. Process Photon Results (มักจะเก่งเรื่อง ซอย, ถนน, พิมพ์ผิด)
-            if (photonRes.status === 'fulfilled' && photonRes.value.ok) {
-                const photonData = await photonRes.value.json();
-                const photonMapped = (photonData.features || []).map(feature => {
-                    const props = feature.properties;
-                    const coords = feature.geometry.coordinates;
+            if (data && Array.isArray(data.features)) {
+                results = data.features.map(feature => {
+                    const coords = feature.geometry.coordinates; // [lng, lat] จาก Mapbox
                     
-                    // สร้างชื่อรอง (เช่น คลองตันเหนือ, วัฒนา, กรุงเทพมหานคร)
-                    const subName = [props.locality, props.district, props.city, props.state]
-                        .filter(Boolean)
-                        .filter((v, i, a) => a.indexOf(v) === i) // unique
-                        .slice(0, 2)
-                        .join(', ');
-                        
-                    const displayName = props.name ? `${props.name}${subName ? ' ('+subName+')' : ''}` : subName;
+                    let provinceName = 'ประเทศไทย';
+                    if (feature.context) {
+                        const regionContext = feature.context.find(c => c.id.startsWith('region'));
+                        if (regionContext) provinceName = regionContext.text;
+                    }
 
                     return {
-                        name: displayName || 'ไม่ระบุชื่อ',
-                        latitude: parseFloat(coords[1]),
-                        longitude: parseFloat(coords[0]),
-                        admin1: props.city || props.state || 'ประเทศไทย',
-                        country: props.countrycode || 'TH',
-                        source: 'photon'
+                        name: feature.place_name || 'ไม่ระบุชื่อ',
+                        lat: parseFloat(coords[1]),  // 👈 ละติจูดคือตัวที่สอง coords[1]
+                        lon: parseFloat(coords[0]),  // 👈 ลองจิจูดคือตัวแรก coords[0]
+                        province: provinceName,
+                        region: null
                     };
                 });
-                results.push(...photonMapped);
             }
 
-            // 2. Process Nominatim Results (เก่งเรื่อง ตำบล, อำเภอ, จังหวัดทางการ)
-            if (nomRes.status === 'fulfilled' && nomRes.value.ok) {
-                const nomData = await nomRes.value.json();
-                const nomMapped = nomData.map(item => {
-                    const address = item.address || {};
-                    const province = address.province || address.state || address.city || address.town || 'ประเทศไทย';
-                    const shortDisplay = item.display_name.split(',').slice(0, 3).join(', ');
-                    
-                    return {
-                        name: item.name || shortDisplay,
-                        latitude: parseFloat(item.lat),
-                        longitude: parseFloat(item.lon),
-                        admin1: province,
-                        country: address.country_code ? address.country_code.toUpperCase() : 'TH',
-                        source: 'nominatim'
-                    };
-                });
-                results.push(...nomMapped);
-            }
-
-            // 3. Deduplicate by coordinates (ลบจุดที่ซ้ำกันหรือใกล้กันมากๆ ในระยะ ~500 เมตร)
-            const uniqueResults = [];
-            for (const item of results) {
-                const isDuplicate = uniqueResults.some(u => 
-                    Math.abs(u.latitude - item.latitude) < 0.005 && 
-                    Math.abs(u.longitude - item.longitude) < 0.005
-                );
-                if (!isDuplicate) {
-                    uniqueResults.push(item);
-                }
-            }
-
-            return uniqueResults.slice(0, 10); // คืนค่าสูงสุด 10 รายการ
+            return results;
 
         } catch (err) {
-            console.warn('WeatherService: Geocoding ล้มเหลว:', err);
+            console.warn('WeatherService: Mapbox Geocoding ล้มเหลว:', err);
             return [];
         }
     },
@@ -1364,10 +1322,10 @@ function calculateDistanceKm(lat1, lon1, lat2, lon2) {
                             const apiResults = await queryGeocodingApi(query);
                             if (apiResults && apiResults.length > 0) {
                                 const formattedApi = apiResults.map(item => ({
-                                    name: `${item.name} (${item.admin1 || item.country || ''})`,
-                                    lat: item.latitude,
-                                    lon: item.longitude,
-                                    province: item.admin1 || item.name,
+                                    name: item.name,
+                                    lat: item.lat,
+                                    lon: item.lon,
+                                    province: item.province || item.admin1 || item.country || '',
                                     region: null,
                                     isApiResult: true
                                 }));
